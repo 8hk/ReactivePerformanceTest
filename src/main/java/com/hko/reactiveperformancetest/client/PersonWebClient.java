@@ -18,6 +18,10 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClient;
 import org.slf4j.*;
+import reactor.netty.resources.ConnectionProvider;
+
+import java.time.Duration;
+
 public class PersonWebClient {
 
     private static Logger logger = LoggerFactory.getLogger(PersonWebClient.class);
@@ -34,13 +38,19 @@ public class PersonWebClient {
 //    }
 
     public PersonWebClient(){
-        HttpClient httpClient = HttpClient.create()
+        ConnectionProvider provider =
+                ConnectionProvider.builder("fixed")
+                        .maxConnections(100000)
+                        .pendingAcquireTimeout(Duration.ofMillis(3000))
+                        .maxIdleTime(Duration.ofMillis(600))
+                        .metrics(true)
+                        .build();
+        HttpClient httpClient = HttpClient.create(provider)
                 .tcpConfiguration(client ->
                         client.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000)
                                 .doOnConnected(conn -> conn
                                         .addHandlerLast(new ReadTimeoutHandler(10))
                                         .addHandlerLast(new WriteTimeoutHandler(10))));
-
         ClientHttpConnector connector = new ReactorClientHttpConnector(httpClient);
 
         client = WebClient.builder()
@@ -65,7 +75,7 @@ public class PersonWebClient {
                 .bodyToMono(String.class);
 
         String response= result.block();
-        logger.info("Response: {}", response);
+//        logger.info("Response: {}", response);
         return result;
     }
 
